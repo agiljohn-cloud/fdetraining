@@ -122,7 +122,7 @@ printf '%s' "${INSTACART_PARTNER_API_TOKEN}" | gcloud secrets versions add insta
 printf '%s' "${HITL_APPROVAL_SIGNING_SECRET}" | gcloud secrets versions add hitl-approval-signing-secret --data-file=-
 ```
 
-### 4.5 Live Vertex AI Agent Engine Deployment & Interactive UI Studio (`agiljohn-cert-oct2026` / `us-east1`)
+### 4.5 Live Vertex AI Agent Engine Deployment (`agiljohn-cert-oct2026` / `us-east1`)
 
 - **Deployed ReasoningEngine Resource:** `projects/299574328047/locations/us-east1/reasoningEngines/568358451118342144`
 - **GCP Project / Region:** `agiljohn-cert-oct2026` (`us-east1`)
@@ -135,9 +135,6 @@ python3 deploy_agent_platform.py --project agiljohn-cert-oct2026 --location us-e
 # Send a live streaming query to the deployed ReasoningEngine in us-east1
 python3 deploy_agent_platform.py --project agiljohn-cert-oct2026 --location us-east1 \
   --query "Plan a 7-day Mediterranean meal plan for muscle gain with zero peanuts or shellfish"
-
-# Launch the interactive ChefAura UI Studio Server (http://127.0.0.1:8090)
-python3 ui_server.py --port 8090
 ```
 
 ---
