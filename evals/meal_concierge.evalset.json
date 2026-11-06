@@ -1,0 +1,149 @@
+{
+  "eval_set_id": "meal_concierge_adk_evalset_v1",
+  "name": "Autonomous Meal Planning Concierge ADK Evaluation Set",
+  "description": "Google ADK compatible evaluation set (.evalset.json) verifying tool trajectory accuracy and response quality.",
+  "eval_cases": [
+    {
+      "eval_id": "eval-01-mediterranean-anaphylactic-allergies",
+      "conversation": [
+        {
+          "invocation_id": "inv-001",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Plan my 7-day Mediterranean meal schedule and stage a Whole Foods grocery cart. I have severe peanut and shellfish allergies."
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Generated 7-day mediterranean meal plan with zero peanut or shellfish exposure, aisle-sorted grocery list after pantry deduction, and staged Whole Foods checkout pending human approval."
+              }
+            ]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "calculate_weekly_macro_targets",
+                "args": {
+                  "user_id": "user_med_01",
+                  "dietary_restriction": "mediterranean",
+                  "allergies": ["peanuts", "shellfish"]
+                }
+              },
+              {
+                "name": "check_pantry_inventory_levels",
+                "args": {
+                  "household_id": "user_med_01",
+                  "include_expiring_within_days": 5
+                }
+              },
+              {
+                "name": "search_allergen_safe_recipes",
+                "args": {
+                  "dietary_restriction": "mediterranean",
+                  "excluded_allergens": ["peanuts", "shellfish"]
+                }
+              },
+              {
+                "name": "validate_meal_plan_nutrition_compliance",
+                "args": {
+                  "user_id": "user_med_01"
+                }
+              },
+              {
+                "name": "generate_aisle_sorted_grocery_list",
+                "args": {
+                  "household_id": "user_med_01",
+                  "weekly_budget_usd": 140.0
+                }
+              },
+              {
+                "name": "place_instacart_grocery_order",
+                "args": {
+                  "household_id": "user_med_01",
+                  "retailer_name": "Whole Foods Market",
+                  "human_approved": false
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "eval-02-vegan-fat-loss-soy-gluten-free",
+      "conversation": [
+        {
+          "invocation_id": "inv-002",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Build a 7-day vegan fat-loss meal plan under $125/week with zero gluten or tree nuts."
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Generated 7-day vegan fat-loss meal plan under $125/week with zero gluten or tree nuts and staged grocery checkout pending human approval."
+              }
+            ]
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "calculate_weekly_macro_targets",
+                "args": {
+                  "user_id": "user_vegan_02",
+                  "dietary_restriction": "vegan",
+                  "allergies": ["gluten", "tree_nuts"]
+                }
+              },
+              {
+                "name": "check_pantry_inventory_levels",
+                "args": {
+                  "household_id": "user_vegan_02",
+                  "include_expiring_within_days": 5
+                }
+              },
+              {
+                "name": "search_allergen_safe_recipes",
+                "args": {
+                  "dietary_restriction": "vegan",
+                  "excluded_allergens": ["gluten", "tree_nuts"]
+                }
+              },
+              {
+                "name": "validate_meal_plan_nutrition_compliance",
+                "args": {
+                  "user_id": "user_vegan_02"
+                }
+              },
+              {
+                "name": "generate_aisle_sorted_grocery_list",
+                "args": {
+                  "household_id": "user_vegan_02",
+                  "weekly_budget_usd": 125.0
+                }
+              },
+              {
+                "name": "place_instacart_grocery_order",
+                "args": {
+                  "household_id": "user_vegan_02",
+                  "retailer_name": "Whole Foods Market",
+                  "human_approved": false
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

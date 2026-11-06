@@ -1,0 +1,60 @@
+steps:
+  # Step 1: Install Dependencies, Run Unit Tests & Static Secret Scan
+  - name: "python:3.12-slim"
+    id: "unit-tests"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        pip install --no-cache-dir -r requirements.txt
+        python3 -m unittest discover -s tests -v
+
+  # Step 2: Execute Golden Dataset & Trajectory Evaluation Suite (Category 5.1)
+  - name: "python:3.12-slim"
+    id: "golden-evaluation"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        pip install --no-cache-dir -r requirements.txt
+        python3 -m evals.evaluate_agent
+
+  # Step 3: Validate Terraform Infrastructure as Code (Category 5.2)
+  - name: "hashicorp/terraform:1.8"
+    id: "terraform-validate"
+    dir: "terraform"
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        terraform init -backend=false
+        terraform validate
+
+  # Step 4: Build ADK Agent Container Image
+  - name: "gcr.io/cloud-builders/docker"
+    id: "build-image"
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/agents/meal-concierge:${SHORT_SHA}"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/agents/meal-concierge:latest"
+      - "."
+
+  # Step 5: Push Container Image to Artifact Registry
+  - name: "gcr.io/cloud-builders/docker"
+    id: "push-image"
+    args:
+      - "push"
+      - "--all-tags"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/agents/meal-concierge"
+
+images:
+  - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/agents/meal-concierge:${SHORT_SHA}"
+  - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/agents/meal-concierge:latest"
+
+substitutions:
+  _REGION: "us-central1"
+
+options:
+  logging: CLOUD_LOGGING_ONLY

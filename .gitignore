@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+dist/
+build/
+*.sqlite3
+.terraform/
+*.tfstate
+*.tfstate.*
+.env
