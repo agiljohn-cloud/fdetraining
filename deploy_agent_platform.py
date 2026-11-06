@@ -44,6 +44,42 @@ DEPLOY_REQUIREMENTS = [
 ]
 
 
+def get_gcloud_user_credentials(project_id: str) -> Any:
+    """Build a refreshable `google.oauth2.credentials.Credentials` backed by `gcloud auth print-access-token`."""
+    import google.auth
+    from google.oauth2.credentials import Credentials
+
+    def _fetch_token() -> str:
+        out = subprocess.check_output(
+            ["gcloud", "auth", "print-access-token"],
+            text=True,
+        ).strip()
+        if not out:
+            raise RuntimeError("Empty token returned by `gcloud auth print-access-token`.")
+        return out
+
+    class _GcloudCliCredentials(Credentials):
+        def __init__(self, token: str, quota_project_id: str) -> None:
+            super().__init__(token=token, quota_project_id=quota_project_id)
+
+        def refresh(self, request: Any) -> None:
+            self.token = _fetch_token()
+
+        @property
+        def valid(self) -> bool:
+            return bool(self.token)
+
+        @property
+        def expired(self) -> bool:
+            return False
+
+    creds = _GcloudCliCredentials(token=_fetch_token(), quota_project_id=project_id)
+    # Ensure internal SDK calls (e.g. google.cloud.storage.Client during staging upload)
+    # also use the authenticated gcloud CLI user credentials rather than GCE metadata server.
+    google.auth.default = lambda *args, **kwargs: (creds, project_id)  # type: ignore
+    return creds
+
+
 def ensure_apis_and_staging_bucket(project_id: str, location: str, staging_bucket: str) -> None:
     """Ensure required Vertex AI / Agent Platform APIs and the regional GCS staging bucket exist."""
     apis = [
@@ -90,36 +126,43 @@ def ensure_apis_and_staging_bucket(project_id: str, location: str, staging_bucke
 def build_adk_app(
     project_id: str = DEFAULT_PROJECT_ID,
     location: str = DEFAULT_LOCATION,
+    credentials: Any = None,
 ) -> Any:
-    """Build the `AdkApp` wrapper around `meal_concierge.agent.root_agent` with streaming enabled."""
+    """Build the `AdkApp` wrapper around `meal_concierge.agent` with streaming enabled."""
     import vertexai
-    from meal_concierge.agent import root_agent
+    from meal_concierge.agent import build_meal_concierge_agent_hierarchy
 
     os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
     os.environ["GOOGLE_CLOUD_LOCATION"] = location
-    vertexai.init(project=project_id, location=location)
+    os.environ["CHEFAURA_PRO_MODEL"] = "gemini-3.1-pro-preview"
+    os.environ["CHEFAURA_FLASH_MODEL"] = "gemini-3.5-flash"
+    vertexai.init(project=project_id, location=location, credentials=credentials)
 
     try:
         from vertexai.agent_engines import AdkApp
     except ImportError:
         from vertexai.preview.reasoning_engines import AdkApp  # type: ignore
 
+    runtime_agent = build_meal_concierge_agent_hierarchy()
+
     class ChefAuraAdkApp(AdkApp):
-        """ADK App wrapper supporting both synchronous `query` and generator `stream_query`."""
+        """ADK App wrapper routing Gemini 3.1 Pro / 3.5 Flash calls to the global Vertex endpoint."""
 
-        def query(self, *args: Any, **kwargs: Any) -> Any:
-            return super().query(*args, **kwargs)
+        def set_up(self) -> None:
+            os.environ["CHEFAURA_PRO_MODEL"] = "gemini-3.1-pro-preview"
+            os.environ["CHEFAURA_FLASH_MODEL"] = "gemini-3.5-flash"
+            super().set_up()
+            # Route Gemini 3.1 Pro / 3.5 Flash publisher model invocations to the Vertex AI global endpoint
+            os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
 
-        def stream_query(self, *args: Any, **kwargs: Any):
-            yield from super().stream_query(*args, **kwargs)
-
-    return ChefAuraAdkApp(agent=root_agent, enable_tracing=True)
+    return ChefAuraAdkApp(agent=runtime_agent)
 
 
 def find_existing_engine_resource_name(
     project_id: str,
     location: str,
     display_name: str,
+    credentials: Any = None,
 ) -> Optional[str]:
     """Check `deployment_metadata.json` or list existing ReasoningEngines in the target project/region."""
     if METADATA_PATH.exists():
@@ -137,7 +180,7 @@ def find_existing_engine_resource_name(
     try:
         import vertexai
 
-        client = vertexai.Client(project=project_id, location=location)
+        client = vertexai.Client(project=project_id, location=location, credentials=credentials)
         for engine in client.agent_engines.list():
             api_res = getattr(engine, "api_resource", engine)
             if getattr(api_res, "display_name", "") == display_name:
@@ -157,12 +200,14 @@ def deploy_to_agent_platform(
     os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
     os.environ["GOOGLE_CLOUD_LOCATION"] = location
 
-    ensure_apis_and_staging_bucket(project_id, location, staging_bucket)
+    creds = get_gcloud_user_credentials(project_id)
+    if not METADATA_PATH.exists():
+        ensure_apis_and_staging_bucket(project_id, location, staging_bucket)
 
     import vertexai
 
     os.chdir(PROJECT_ROOT)
-    adk_app = build_adk_app()
+    adk_app = build_adk_app(project_id=project_id, location=location, credentials=creds)
 
     print(
         f"[3/4] Deploying '{display_name}' to Vertex AI Agent Platform in {project_id} ({location})..."
@@ -178,17 +223,22 @@ def deploy_to_agent_platform(
         "requirements": DEPLOY_REQUIREMENTS,
         "extra_packages": ["meal_concierge"],
         "env_vars": {
-            "GOOGLE_CLOUD_PROJECT": project_id,
-            "GOOGLE_CLOUD_LOCATION": location,
+            "CHEFAURA_GCP_PROJECT": project_id,
+            "CHEFAURA_GCP_LOCATION": location,
+            "CHEFAURA_PRO_MODEL": "gemini-3.1-pro-preview",
+            "CHEFAURA_FLASH_MODEL": "gemini-3.5-flash",
+            "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY": "true",
             "ENABLE_CLOUD_TRACE": "true",
         },
     }
 
     resource_name: Optional[str] = None
-    existing_name = find_existing_engine_resource_name(project_id, location, display_name)
+    existing_name = find_existing_engine_resource_name(
+        project_id, location, display_name, credentials=creds
+    )
 
     if hasattr(vertexai, "Client"):
-        client = vertexai.Client(project=project_id, location=location)
+        client = vertexai.Client(project=project_id, location=location, credentials=creds)
         if existing_name:
             print(f"Reusing and updating existing ReasoningEngine: {existing_name}")
             remote_agent = client.agent_engines.update(
@@ -208,7 +258,12 @@ def deploy_to_agent_platform(
     else:
         from vertexai.preview.reasoning_engines import ReasoningEngine
 
-        vertexai.init(project=project_id, location=location, staging_bucket=staging_bucket)
+        vertexai.init(
+            project=project_id,
+            location=location,
+            staging_bucket=staging_bucket,
+            credentials=creds,
+        )
         remote_agent = ReasoningEngine.create(
             reasoning_engine=adk_app,
             requirements=DEPLOY_REQUIREMENTS,
@@ -255,8 +310,9 @@ def query_deployed_agent(
     resource_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Send a live query to the deployed ReasoningEngine on Vertex AI Agent Platform."""
+    creds = get_gcloud_user_credentials(project_id)
     resolved_name = resource_name or find_existing_engine_resource_name(
-        project_id, location, DEFAULT_DISPLAY_NAME
+        project_id, location, DEFAULT_DISPLAY_NAME, credentials=creds
     )
     if not resolved_name:
         raise RuntimeError(
@@ -265,19 +321,14 @@ def query_deployed_agent(
 
     import vertexai
 
+    client = vertexai.Client(project=project_id, location=location, credentials=creds)
+    remote_agent = client.agent_engines.get(name=resolved_name)
     events = []
-    if hasattr(vertexai, "Client"):
-        client = vertexai.Client(project=project_id, location=location)
-        remote_agent = client.agent_engines.get(name=resolved_name)
+    if hasattr(remote_agent, "stream_query"):
         for event in remote_agent.stream_query(user_id=user_id, message=prompt):
             events.append(event)
-    else:
-        from vertexai.preview.reasoning_engines import ReasoningEngine
-
-        vertexai.init(project=project_id, location=location)
-        remote_agent = ReasoningEngine(resolved_name)
-        for event in remote_agent.stream_query(user_id=user_id, message=prompt):
-            events.append(event)
+    elif hasattr(remote_agent, "query"):
+        events.append(remote_agent.query(input=prompt, user_id=user_id))
 
     return {
         "status": "success",

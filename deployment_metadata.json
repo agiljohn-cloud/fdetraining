@@ -1,0 +1,13 @@
+{
+  "remote_agent_runtime_id": "projects/299574328047/locations/us-east1/reasoningEngines/568358451118342144",
+  "engine_id": "568358451118342144",
+  "project_id": "agiljohn-cert-oct2026",
+  "location": "us-east1",
+  "staging_bucket": "gs://agiljohn-cert-oct2026-agent-staging-useast1",
+  "display_name": "meal-concierge-agent",
+  "deployment_target": "agent_runtime",
+  "framework": "google-adk",
+  "pantheon_agent_engine_url": "https://pantheon.corp.google.com/vertex-ai/agents/agent-engines/locations/us-east1/agent-engines/568358451118342144?project=agiljohn-cert-oct2026",
+  "pantheon_agent_registry_url": "https://pantheon.corp.google.com/agent-management/agent-registry/agents?project=agiljohn-cert-oct2026",
+  "deployment_timestamp": "2026-11-06T22:56:22.458530+00:00"
+}

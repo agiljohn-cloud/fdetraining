@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import os
 from typing import Any, Dict, List, Optional
 
 from meal_concierge.observability.structured_logger import get_structured_logger
@@ -98,18 +99,18 @@ class StrategicModelRouter:
 
         if use_pro:
             complexity_tier = TaskComplexityTier.COMPLEX_MULTI_CONSTRAINT_PLANNING
-            selected_model = self.PRO_MODEL
+            selected_model = os.environ.get("CHEFAURA_PRO_MODEL", self.PRO_MODEL)
             latency_tier = "deep_reasoning"
             rationale = (
-                f"Routed '{agent_name}' to '{self.PRO_MODEL}' for multi-constraint nutritional, "
+                f"Routed '{agent_name}' to '{selected_model}' for multi-constraint nutritional, "
                 f"allergen, and 7-day culinary planning (constraints={constraint_count})."
             )
         else:
             complexity_tier = TaskComplexityTier.FAST_STRUCTURED_LOOKUP
-            selected_model = self.FLASH_MODEL
+            selected_model = os.environ.get("CHEFAURA_FLASH_MODEL", self.FLASH_MODEL)
             latency_tier = "low_latency"
             rationale = (
-                f"Routed '{agent_name}' to '{self.FLASH_MODEL}' for high-throughput structured "
+                f"Routed '{agent_name}' to '{selected_model}' for high-throughput structured "
                 f"inventory, aisle categorization, and cart aggregation."
             )
 
