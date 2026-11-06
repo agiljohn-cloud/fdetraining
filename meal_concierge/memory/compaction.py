@@ -373,7 +373,11 @@ def _extract_role_and_text(item: Any) -> Dict[str, str]:
 
 def _rebuild_content_item(template_item: Any, role: str, text: str) -> Any:
     """Reconstruct a summary `Content` item matching the type of `template_item`."""
-    if GENAI_TYPES_AVAILABLE and genai_types is not None and not isinstance(template_item, dict):
+    if (
+        GENAI_TYPES_AVAILABLE
+        and genai_types is not None
+        and isinstance(template_item, genai_types.Content)
+    ):
         return genai_types.Content(role=role, parts=[genai_types.Part.from_text(text=text)])
     if hasattr(template_item, "parts") and hasattr(template_item, "role"):
         cls = type(template_item)
@@ -384,6 +388,8 @@ def _rebuild_content_item(template_item: Any, role: str, text: str) -> Any:
             return cls(role=role, parts=[new_part])
         except Exception:
             pass
+    if GENAI_TYPES_AVAILABLE and genai_types is not None and not isinstance(template_item, dict):
+        return genai_types.Content(role=role, parts=[genai_types.Part.from_text(text=text)])
     return {"role": role, "content": text}
 
 

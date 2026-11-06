@@ -1,13 +1,13 @@
 variable "project_id" {
   description = "Google Cloud Project ID hosting the Meal Planning Concierge Agent."
   type        = string
-  default     = "fde-meal-concierge"
+  default     = "agiljohn-cert-oct2026"
 }
 
 variable "region" {
   description = "Primary Google Cloud region for Vertex AI Agent Engine and Cloud Run."
   type        = string
-  default     = "us-central1"
+  default     = "us-east1"
 }
 
 variable "service_name" {
@@ -19,7 +19,7 @@ variable "service_name" {
 variable "container_image" {
   description = "Artifact Registry container image URI for the Meal Concierge ADK service."
   type        = string
-  default     = "us-central1-docker.pkg.dev/fde-meal-concierge/agents/meal-concierge:latest"
+  default     = "us-east1-docker.pkg.dev/agiljohn-cert-oct2026/agents/meal-concierge:latest"
 }
 
 variable "enable_deletion_protection" {
